@@ -1,0 +1,68 @@
+version: "3.8"
+
+services:
+  samba-ad:
+    image: nowsci/samba-domain
+    container_name: samba-ad
+    hostname: dc1
+    environment:
+      DOMAIN: EXAMPLE.LOCAL
+      DOMAINPASS: "Passw0rd!Admin"
+      HOSTIP: 127.0.0.1
+      NOCOMPLEX: "true"
+    ports:
+      - "389:389"
+      - "636:636"
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    privileged: true
+    volumes:
+      - samba-data:/var/lib/samba
+    networks:
+      - adzitadel
+
+  zitadel-db:
+    image: postgres:16
+    container_name: zitadel-db
+    environment:
+      POSTGRES_USER: zitadel
+      POSTGRES_PASSWORD: zitadel
+      POSTGRES_DB: zitadel
+    networks:
+      - adzitadel
+
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:v2.65.1
+    container_name: zitadel
+    command: start-from-init --masterkey "MasterkeyNeedsToHave32Characters" --tlsMode disabled
+    environment:
+      ZITADEL_DATABASE_POSTGRES_HOST: zitadel-db
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: zitadel
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: admin@example.local
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: "Passw0rd!Admin"
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_EXTERNALPORT: "8080"
+      ZITADEL_EXTERNALDOMAIN: localhost
+    depends_on:
+      - zitadel-db
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./zitadel-ca-bundle.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    networks:
+      - adzitadel
+
+networks:
+  adzitadel:
+    driver: bridge
+
+volumes:
+  samba-data:
